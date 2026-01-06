@@ -1,4 +1,0 @@
-streamlit
-nltk
-matplotlib
-pandas
