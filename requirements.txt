@@ -2,3 +2,6 @@ streamlit
 nltk
 matplotlib
 pandas
+torch
+torchvision
+pytorch
