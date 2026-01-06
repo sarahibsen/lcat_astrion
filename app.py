@@ -3,6 +3,7 @@ import sys
 import os
 from streamlit.web import cli as stcli
 
+import nltk 
 
 def main_ui():
 
@@ -61,4 +62,5 @@ def run_app():
     sys.exit(stcli.main())
 
 if __name__ == "__main__":
+
     main_ui()
