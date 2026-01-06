@@ -207,6 +207,8 @@ if uploaded_file:
             st.session_state['results'] = pd.DataFrame(all_matches)
             st.session_state['df_leg_raw'] = df_leg_raw
             st.session_state['df_mas_raw'] = df_mas_raw
+            st.session_state['l_title_col'] = l_title_col
+            st.session_state['m_title_col'] = m_title_col
 
     if 'results' in st.session_state:
         res_df = st.session_state['results']
@@ -231,3 +233,4 @@ if uploaded_file:
 
 else:
     st.info("Please upload an Excel file in the sidebar to begin.")
+
