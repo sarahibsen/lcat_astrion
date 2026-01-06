@@ -1,7 +1,5 @@
-streamlit
-nltk
-matplotlib
 pandas
+nltk
 torch
-sentence_transformers
-re
+matplotlib
+sentence-transformers
