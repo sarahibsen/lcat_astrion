@@ -3,5 +3,5 @@ nltk
 matplotlib
 pandas
 torch
-torchvision
-pytorch
+sentence_transformers
+re
