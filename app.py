@@ -3,8 +3,6 @@ import sys
 import os
 from streamlit.web import cli as stcli
 
-import nltk 
-
 def main_ui():
 
     st.set_page_config(page_title="Astrion LCAT Tool", layout="wide")
@@ -64,3 +62,4 @@ def run_app():
 if __name__ == "__main__":
 
     main_ui()
+
