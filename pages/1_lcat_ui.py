@@ -9,7 +9,12 @@ from sentence_transformers import SentenceTransformer, util
 from nltk.corpus import stopwords
 
 # --- CONFIGURATION ---
-st.set_page_config(page_title="LCAT & SIN Mapper", layout="wide")
+st.set_page_config(
+    page_title = "LCAT Mapping"
+)
+st.title("LCAT & SIN Mapping Tool")
+st.markdown("Map legacy Labor Categories to Master based on Qualifications and Semantic Description similarity.")
+
 
 @st.cache_resource
 def load_resources():
@@ -95,12 +100,6 @@ def draw_match_tree(matches, num_to_show=2):
         y_pos -= 50
     return fig
 
-# --- STREAMLIT UI ---
-st.set_page_config(
-    page_title = "LCAT Mapping"
-)
-st.title("LCAT & SIN Mapping Tool")
-st.markdown("Map legacy Labor Categories to Master based on Qualifications and Semantic Description similarity.")
 
 with st.sidebar:
     st.header("1. Upload Data")
@@ -144,70 +143,70 @@ if uploaded_file:
         m_alt_col = st.selectbox("Alt Quals Column (Master)", df_mas_raw.columns)
         m_rate_col = st.selectbox("Site/Rate Location (Master)", ["None"] + list(df_mas_raw.columns))
 
-if st.button("Run Mapping Logic"):
-    with st.spinner("Analyzing by Site Location..."):
-        leg_groups = rate_split(df_leg_raw, l_rate_col)
-        mas_groups = rate_split(df_mas_raw, m_rate_col)
-        
-        all_matches = []
-
-        for site_name, leg_subset in leg_groups.items():
-            # Check if this site exists in the Master data
-            if site_name not in mas_groups:
-                st.warning(f"No Master LCATs found for site: '{site_name}'. Skipping.")
-                continue
+    if st.button("Run Mapping Logic"):
+        with st.spinner("Analyzing by Site Location..."):
+            leg_groups = rate_split(df_leg_raw, l_rate_col)
+            mas_groups = rate_split(df_mas_raw, m_rate_col)
             
-            mas_subset = mas_groups[site_name]
-            
-            # --- RUN SIMILARITY ON SUBSETS ONLY ---
-            leg_descs = [str(d).strip() for d in leg_subset[l_desc_col]]
-            mas_descs = [str(d).strip() for d in mas_subset[m_desc_col]]
-
-            leg_embeddings = model.encode(leg_descs, convert_to_tensor=True)
-            mas_embeddings = model.encode(mas_descs, convert_to_tensor=True)
-            cosine_scores = util.cos_sim(leg_embeddings, mas_embeddings)
-
-            # Pre-calculate master quals for this subset
-            master_info = []
-            for _, row in mas_subset.iterrows():
-                m_min_val, m_min_str = evaluate_complex_qual_string(str(row[m_min_col]), mode='min')
-                m_alt_val, m_alt_str = evaluate_complex_qual_string(str(row[m_alt_col]), mode='min')
-                if m_min_val > 0 and m_alt_val > 0:
-                    req_val = m_min_val if m_min_val <= m_alt_val else m_alt_val
-                else:
-                    req_val = max(m_min_val, m_alt_val)
-                master_info.append({"score": req_val})
-
-            # Compare within this site
-            for i in range(len(leg_subset)):
-                l_min_val, _ = evaluate_complex_qual_string(str(leg_subset.iloc[i][l_min_col]), mode='max')
-                l_alt_val, _ = evaluate_complex_qual_string(str(leg_subset.iloc[i][l_alt_col]), mode='max')
-                leg_best_val = max(l_min_val, l_alt_val)
-
-                valid_indices = [idx for idx, info in enumerate(master_info) if leg_best_val >= info['score']]
-                
-                if not valid_indices: 
+            all_matches = []
+    
+            for site_name, leg_subset in leg_groups.items():
+                # Check if this site exists in the Master data
+                if site_name not in mas_groups:
+                    st.warning(f"No Master LCATs found for site: '{site_name}'. Skipping.")
                     continue
-
-                valid_sims = cosine_scores[i][valid_indices]
-                k = min(top_k_val, len(valid_sims))
-                top_k = torch.topk(valid_sims, k=k)
-
-                for sim_score, sub_idx in zip(top_k.values, top_k.indices):
-                    m_idx = valid_indices[sub_idx.item()]
+                
+                mas_subset = mas_groups[site_name]
+                
+                # --- RUN SIMILARITY ON SUBSETS ONLY ---
+                leg_descs = [str(d).strip() for d in leg_subset[l_desc_col]]
+                mas_descs = [str(d).strip() for d in mas_subset[m_desc_col]]
+    
+                leg_embeddings = model.encode(leg_descs, convert_to_tensor=True)
+                mas_embeddings = model.encode(mas_descs, convert_to_tensor=True)
+                cosine_scores = util.cos_sim(leg_embeddings, mas_embeddings)
+    
+                # Pre-calculate master quals for this subset
+                master_info = []
+                for _, row in mas_subset.iterrows():
+                    m_min_val, m_min_str = evaluate_complex_qual_string(str(row[m_min_col]), mode='min')
+                    m_alt_val, m_alt_str = evaluate_complex_qual_string(str(row[m_alt_col]), mode='min')
+                    if m_min_val > 0 and m_alt_val > 0:
+                        req_val = m_min_val if m_min_val <= m_alt_val else m_alt_val
+                    else:
+                        req_val = max(m_min_val, m_alt_val)
+                    master_info.append({"score": req_val})
+    
+                # Compare within this site
+                for i in range(len(leg_subset)):
+                    l_min_val, _ = evaluate_complex_qual_string(str(leg_subset.iloc[i][l_min_col]), mode='max')
+                    l_alt_val, _ = evaluate_complex_qual_string(str(leg_subset.iloc[i][l_alt_col]), mode='max')
+                    leg_best_val = max(l_min_val, l_alt_val)
+    
+                    valid_indices = [idx for idx, info in enumerate(master_info) if leg_best_val >= info['score']]
                     
-                    all_matches.append({
-                        "Site": site_name.upper(), # Tracks which group this came from
-                        "Legacy Title": leg_subset.iloc[i][l_title_col],
-                        "Master Title": mas_subset.iloc[m_idx][m_title_col],
-                        "Similarity Score": round(sim_score.item(), 3),
-                        "Legacy SIN": leg_subset.iloc[i][l_sin_col],
-                        "Master SIN": mas_subset.iloc[m_idx][m_sin_col]
-                    })
+                    if not valid_indices: 
+                        continue
+    
+                    valid_sims = cosine_scores[i][valid_indices]
+                    k = min(top_k_val, len(valid_sims))
+                    top_k = torch.topk(valid_sims, k=k)
+    
+                    for sim_score, sub_idx in zip(top_k.values, top_k.indices):
+                        m_idx = valid_indices[sub_idx.item()]
+                        
+                        all_matches.append({
+                            "Site": site_name.upper(), # Tracks which group this came from
+                            "Legacy Title": leg_subset.iloc[i][l_title_col],
+                            "Master Title": mas_subset.iloc[m_idx][m_title_col],
+                            "Similarity Score": round(sim_score.item(), 3),
+                            "Legacy SIN": leg_subset.iloc[i][l_sin_col],
+                            "Master SIN": mas_subset.iloc[m_idx][m_sin_col]
+                        })
 
-        st.session_state['results'] = pd.DataFrame(all_matches)
-        st.session_state['df_leg_raw'] = df_leg_raw
-        st.session_state['df_mas_raw'] = df_mas_raw
+            st.session_state['results'] = pd.DataFrame(all_matches)
+            st.session_state['df_leg_raw'] = df_leg_raw
+            st.session_state['df_mas_raw'] = df_mas_raw
 
     if 'results' in st.session_state:
         res_df = st.session_state['results']
